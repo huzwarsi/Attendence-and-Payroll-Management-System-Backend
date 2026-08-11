@@ -1,0 +1,117 @@
+// Prisma Schema for Attendance & Payroll System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  password_hash String
+  created_at    DateTime @default(now())
+
+  @@map("admins")
+}
+
+model Staff {
+  id                      Int          @id @default(autoincrement())
+  full_name               String
+  phone                   String
+  email                   String       @unique
+  address                 String
+  cnic                    String       @unique
+  emergency_contact       String
+  designation             String
+  joining_date            DateTime
+  basic_salary            Float        @default(0.0)
+  allowance_transport     Float        @default(0.0)
+  allowance_food          Float        @default(0.0)
+  allowance_other         Float        @default(0.0)
+  deduction_late_amount   Float        @default(0.0)
+  deduction_absence_amount Float       @default(0.0)
+  deduction_other         Float        @default(0.0)
+  check_in_time           String       @default("09:00") // Assigned shift start
+  check_out_time          String       @default("17:00") // Assigned shift end
+  allowed_monthly_leaves  Int          @default(2)
+  allowed_paid_leaves     Int          @default(1)
+  password_hash           String
+  is_active               Boolean      @default(true)
+  created_at              DateTime     @default(now())
+  updated_at              DateTime     @updatedAt
+
+  attendances             Attendance[]
+  payrolls                Payroll[]
+
+  @@map("staff")
+}
+
+model Attendance {
+  id                  Int       @id @default(autoincrement())
+  staff_id            Int
+  staff               Staff     @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+  date                DateTime  @db.Date
+  check_in_time       DateTime?
+  check_out_time      DateTime?
+  status              String    @default("absent") // 'present', 'late', 'absent'
+  total_working_hours Float?    @default(0.0)
+  total_break_minutes Float?    @default(0.0)
+  created_at          DateTime  @default(now())
+
+  breaks              Break[]
+
+  @@unique([staff_id, date])
+  @@map("attendance")
+}
+
+model Break {
+  id            Int        @id @default(autoincrement())
+  attendance_id Int
+  attendance    Attendance @relation(fields: [attendance_id], references: [id], onDelete: Cascade)
+  break_start   DateTime
+  break_end     DateTime?
+
+  @@map("breaks")
+}
+
+model QRCode {
+  id             Int      @id @default(autoincrement())
+  qr_token       String   @unique
+  generated_date DateTime @default(now())
+  expires_at     DateTime
+  is_active      Boolean  @default(true)
+
+  @@map("qr_codes")
+}
+
+model Payroll {
+  id                     Int      @id @default(autoincrement())
+  staff_id               Int
+  staff                  Staff    @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+  month                  Int
+  year                   Int
+  present_days           Int      @default(0)
+  absent_days            Int      @default(0)
+  late_count             Int      @default(0)
+  allowed_monthly_leaves Int      @default(0)
+  allowed_paid_leaves    Int      @default(0)
+  leaves_used            Int      @default(0)
+  excess_leaves          Int      @default(0)
+  remaining_leaves       Int      @default(0)
+  basic_salary           Float    @default(0.0)
+  total_allowances       Float    @default(0.0)
+  late_deduction         Float    @default(0.0)
+  absence_deduction      Float    @default(0.0)
+  other_deduction        Float    @default(0.0)
+  total_deduction        Float    @default(0.0)
+  net_salary             Float    @default(0.0)
+  generated_at           DateTime @default(now())
+
+  @@unique([staff_id, month, year])
+  @@map("payroll")
+}
