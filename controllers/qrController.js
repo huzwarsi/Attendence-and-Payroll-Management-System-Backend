@@ -3,21 +3,36 @@ const QRCode = require('qrcode');
 const prisma = require('../config/prisma');
 
 const getBaseFrontendUrl = (req) => {
+  // 1. Explicit FRONTEND_URL env var if not localhost
   if (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes('localhost')) {
     return process.env.FRONTEND_URL.replace(/\/$/, '');
   }
 
-  if (req?.headers?.origin) {
+  // 2. Origin header (POST/CORS)
+  if (req?.headers?.origin && !req.headers.origin.includes('localhost')) {
     return req.headers.origin.replace(/\/$/, '');
   }
 
+  // 3. Referer header (GET requests from browser)
   if (req?.headers?.referer) {
     try {
       const url = new URL(req.headers.referer);
-      return url.origin;
-    } catch (e) {
-      // fallback
-    }
+      if (!url.origin.includes('localhost')) {
+        return url.origin;
+      }
+    } catch (e) {}
+  }
+
+  // 4. Host header from Vercel reverse proxy
+  const host = req?.headers?.['x-forwarded-host'] || req?.headers?.host;
+  if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+    const proto = req?.headers?.['x-forwarded-proto'] || 'https';
+    return `${proto}://${host}`;
+  }
+
+  // 5. Default Production Vercel URL fallback
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    return 'https://attendence-and-payroll-management-s-sigma.vercel.app';
   }
 
   return (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
