@@ -20,12 +20,31 @@ const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // CORS configuration
+const allowedOrigins = [
+  FRONTEND_URL,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: [FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, postman)
+      if (!origin) return callback(null, true);
+
+      const isAllowed =
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        process.env.NODE_ENV !== 'production';
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
   })
 );
 
@@ -33,17 +52,30 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// API Routes
+// API Routes (mounted both with and without /api prefix for deployment flexibility)
 app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
+
 app.use('/api/staff', staffRoutes);
+app.use('/staff', staffRoutes);
+
 app.use('/api/qr', qrRoutes);
+app.use('/qr', qrRoutes);
+
 app.use('/api/attendance', attendanceRoutes);
+app.use('/attendance', attendanceRoutes);
+
 app.use('/api/payroll', payrollRoutes);
+app.use('/payroll', payrollRoutes);
+
 app.use('/api/portal', portalRoutes);
+app.use('/portal', portalRoutes);
+
 app.use('/api/reports', reportsRoutes);
+app.use('/reports', reportsRoutes);
 
 // Admin Dashboard Summary Cards Endpoint
-app.get('/api/dashboard/stats', verifyAdmin, async (req, res) => {
+app.get(['/api/dashboard/stats', '/dashboard/stats'], verifyAdmin, async (req, res) => {
   try {
     const today = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
 
@@ -101,9 +133,13 @@ app.use((err, req, res, next) => {
 });
 
 // Start Server & Init Cron
-app.listen(PORT, () => {
-  console.log(`==================================================`);
-  console.log(`🚀 Express Server running on http://localhost:${PORT}`);
-  console.log(`==================================================`);
-  initAbsenceCron();
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`==================================================`);
+    console.log(`🚀 Express Server running on http://localhost:${PORT}`);
+    console.log(`==================================================`);
+    initAbsenceCron();
+  });
+}
+
+module.exports = app;
