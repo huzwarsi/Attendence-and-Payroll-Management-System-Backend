@@ -135,8 +135,64 @@ const getMe = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
+
+    if (req.user.role === 'admin') {
+      const admin = await prisma.admin.findUnique({
+        where: { id: req.user.id },
+        select: { id: true, name: true, email: true }
+      });
+
+      if (!admin) {
+        return res.status(401).json({ error: 'Admin user not found.' });
+      }
+
+      return res.json({
+        user: {
+          id: admin.id,
+          name: admin.name,
+          email: admin.email,
+          role: 'admin'
+        }
+      });
+    } else if (req.user.role === 'staff') {
+      const staffId = Number(req.user.id || req.user.staff_id);
+      const staff = await prisma.staff.findUnique({
+        where: { id: staffId },
+        select: {
+          id: true,
+          full_name: true,
+          email: true,
+          phone: true,
+          designation: true,
+          is_active: true
+        }
+      });
+
+      if (!staff) {
+        return res.status(401).json({ error: 'Staff member not found.' });
+      }
+
+      if (!staff.is_active) {
+        return res.status(403).json({ error: 'Staff account is inactive.' });
+      }
+
+      return res.json({
+        user: {
+          id: staff.id,
+          staff_id: staff.id,
+          name: staff.full_name,
+          full_name: staff.full_name,
+          email: staff.email,
+          phone: staff.phone,
+          designation: staff.designation,
+          role: 'staff'
+        }
+      });
+    }
+
     return res.json({ user: req.user });
   } catch (error) {
+    console.error('getMe error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
