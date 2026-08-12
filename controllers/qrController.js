@@ -2,7 +2,26 @@ const crypto = require('crypto');
 const QRCode = require('qrcode');
 const prisma = require('../config/prisma');
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const getBaseFrontendUrl = (req) => {
+  if (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes('localhost')) {
+    return process.env.FRONTEND_URL.replace(/\/$/, '');
+  }
+
+  if (req?.headers?.origin) {
+    return req.headers.origin.replace(/\/$/, '');
+  }
+
+  if (req?.headers?.referer) {
+    try {
+      const url = new URL(req.headers.referer);
+      return url.origin;
+    } catch (e) {
+      // fallback
+    }
+  }
+
+  return (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+};
 
 // Generate new daily QR token (admin)
 const generateQR = async (req, res) => {
@@ -26,7 +45,8 @@ const generateQR = async (req, res) => {
       }
     });
 
-    const scanUrl = `${FRONTEND_URL}/scan/${qr_token}`;
+    const frontendBaseUrl = getBaseFrontendUrl(req);
+    const scanUrl = `${frontendBaseUrl}/scan/${qr_token}`;
     const qr_image_base64 = await QRCode.toDataURL(scanUrl, {
       width: 400,
       margin: 2,
@@ -77,7 +97,8 @@ const getTodayQR = async (req, res) => {
       });
     }
 
-    const scanUrl = `${FRONTEND_URL}/scan/${activeQR.qr_token}`;
+    const frontendBaseUrl = getBaseFrontendUrl(req);
+    const scanUrl = `${frontendBaseUrl}/scan/${activeQR.qr_token}`;
     const qr_image_base64 = await QRCode.toDataURL(scanUrl, {
       width: 400,
       margin: 2,
